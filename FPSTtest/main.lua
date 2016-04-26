@@ -184,11 +184,15 @@ function love.update(dt)
 			end
 			if v.isTouching(Ship) then
 				gameOver = true;
+				Missles = {};
+				Asteroids = {};
+				UFO.Active = false;
+				UFO.Missles = {};
 				makeBoom(Ship.Position);
 				Ship.Dead = true;
 			end
 		end
-		love.window.setMode( Options.curSize.X, Options.curSize.Y, {resizable=true, vsync=false, fullscreen=false,minwidth=800,minheight=600});
+		--love.window.setMode( Options.curSize.X, Options.curSize.Y, {resizable=true, vsync=false, fullscreen=false,minwidth=800,minheight=600});
 		for i,v in pairs(Asteroids) do
 			v.Position.X = v.Position.X + math.cos((v.Rotation)) * v.Speed;
 			v.Position.Y = v.Position.Y + math.sin((v.Rotation)) * v.Speed;
@@ -199,7 +203,7 @@ function love.update(dt)
 					if v.isTouching(mi) then
 						table.remove(Missles,x);
 						makeRubble(v);
-						Points = 100/v.Size;
+						Points = Points + 100/v.Size;
 						table.remove(Asteroids,i);
 					end
 				end
@@ -211,6 +215,10 @@ function love.update(dt)
 				end
 				if v.isTouching(Ship) then
 					gameOver = true;
+					Missles = {};
+					Asteroids = {};
+					UFO.Active = false;
+					UFO.Missles = {};
 					makeBoom(Ship.Position);
 					Ship.Dead = true;
 				end
