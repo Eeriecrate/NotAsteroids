@@ -1,12 +1,27 @@
 function love.load()
 	math.randomseed(os.time());
 	math_functions = require("math_functions");
+	--love.graphics.setColor(math.random(1,255),math.random(1,255),math.random(1,255));
 	Options = {};
 	Options.curSize = {};
 	Options.curSize.X = 800;
 	Options.curSize.Y = 600;
 	Options.Fullscreen = false;
 	gameOver = false;
+	Points = 0;
+	Booms = {};
+	BoomImage = love.graphics.newImage("Boom.png");
+	function makeBoom(where)
+		local Boom = {};
+		Boom.Position = {};
+		Boom.Position.X = where.X;
+		Boom.Position.Y = where.Y;
+		Boom.Size = 0;
+		Boom.maxSize = 0.3703703703703704;
+		Boom.iteration = 0.003;
+		table.insert(Booms,Boom);
+	end
+
 	love.graphics.setDefaultFilter("nearest", "nearest");
 	Sounds = {};
 	Sounds.Pew = love.audio.newSource("Pew.wav","static");
@@ -17,6 +32,7 @@ function love.load()
 	Ship.Size.X = 20;
 	Ship.Size.Y = 20;
 	Ship.Speed = 0;
+	Ship.Dead = false;
 	Ship.Position = {};
 	Ship.Position.X = 400-20;
 	Ship.Position.Y = 300-20;
@@ -64,10 +80,10 @@ function love.load()
 	UFO.Shoot = function()
 		UFO.missleCool = 90;
 		local Missle = {};
-		Missle.Rotation = math_functions.getAngleTo(math_functions.packageLocation(UFO.Position.X,UFO.Position.Y),math_functions.packageLocation(Ship.Position.X,Ship.Position.Y));
 		Missle.Position = {};
-		Missle.Position.X = UFO.Position.X;
-		Missle.Position.Y = UFO.Position.Y
+		Missle.Position.X = UFO.Position.X+((135*.25)*.5);
+		Missle.Position.Y = UFO.Position.Y+((135*.25)*.5);
+		Missle.Rotation = math_functions.getAngleTo(math_functions.packageLocation(Missle.Position.X,Missle.Position.Y),math_functions.packageLocation(Ship.Position.X,Ship.Position.Y));
 		Missle.Speed = 5;
 		function Missle.isTouching(x)
 				return (math.abs((x.Position.X - (Missle.Position.X)))<=(10) and (math.abs((x.Position.Y - (Missle.Position.Y)))<=(10)));
@@ -151,8 +167,8 @@ function love.update(dt)
 			UFO.Position.X = math.random(0,800);
 			UFO.RedirectUFO();
 		elseif UFO.Active then
-			UFO.Shoot();
 			if UFO.missleCool == 0 then
+				UFO.Shoot();
 			end
 				UFO.Position.X = UFO.Position.X + math.cos(UFO.Rotation) * UFO.Speed;
 				UFO.Position.Y = UFO.Position.Y + math.sin(UFO.Rotation) * UFO.Speed;
@@ -168,6 +184,8 @@ function love.update(dt)
 			end
 			if v.isTouching(Ship) then
 				gameOver = true;
+				makeBoom(Ship.Position);
+				Ship.Dead = true;
 			end
 		end
 		love.window.setMode( Options.curSize.X, Options.curSize.Y, {resizable=true, vsync=false, fullscreen=false,minwidth=800,minheight=600});
@@ -181,11 +199,20 @@ function love.update(dt)
 					if v.isTouching(mi) then
 						table.remove(Missles,x);
 						makeRubble(v);
+						Points = 100/v.Size;
 						table.remove(Asteroids,i);
 					end
 				end
+				if v.isTouching(UFO) and (UFO.Active) then
+					UFO.Active = false;
+					UFO.coolDown = 300;
+					makeBoom(UFO.Position);
+					Points = Points + 125;
+				end
 				if v.isTouching(Ship) then
 					gameOver = true;
+					makeBoom(Ship.Position);
+					Ship.Dead = true;
 				end
 			end
 		end
@@ -194,9 +221,11 @@ function love.update(dt)
 		for i,v in pairs(Missles) do
 			v.Position.X = v.Position.X + math.cos(v.Rotation) * v.Speed;
 			v.Position.Y = v.Position.Y + math.sin(v.Rotation) * v.Speed;
-			if v.isTouching(UFO) then
+			if v.isTouching(UFO) and UFO.Active then
 				UFO.Active = false;
 				UFO.coolDown = 300;
+				makeBoom(UFO.Position);
+				Points = Points + 250
 			end
 			if v.Position.X >= 900 or v.Position.X <= -100 or v.Position.Y <= -100 or v.Position.Y >= 700 then
 				table.remove(Missles,i);
@@ -250,9 +279,14 @@ function love.keyreleased(key)
 end
 
 function love.draw()
-	love.graphics.print(UFO.missleCool)
-	if UFO.Active then
-		love.graphics.draw(UFO.Image,UFO.Position.X,UFO.Position.Y,0,.25,.25,(135*.25)*.25,(135*.25)*.25);
+	love.graphics.print(math.floor(Points));
+	for i,v in pairs(Booms) do
+		if v.Size >= v.maxSize then
+			table.remove(Booms,i);
+		else
+			v.Size = v.Size + v.iteration;
+		end
+		love.graphics.draw(BoomImage,v.Position.X-((v.Size*135)*.5),v.Position.Y-((v.Size*135)*.5),0,v.Size,v.Size);
 	end
 	for i,v in pairs(Asteroids) do
 		love.graphics.draw(asteroidImage,v.Position.X,v.Position.Y,math.rad(v.Rotation),v.Size,v.Size,(6.25)*v.Size,(6.25)*v.Size);
@@ -260,8 +294,15 @@ function love.draw()
 	for i,v in pairs(Missles) do
 		love.graphics.draw(missleImage,v.Position.X,v.Position.Y,math.rad(v.Rotation),1,1,2.5,2.5)
 	end
+	love.graphics.setColor(255,0,0,255);
 	for i,v in pairs(UFO.Missles) do
 		love.graphics.draw(missleImage,v.Position.X,v.Position.Y,math.rad(v.Rotation),1,1,2.5,2.5)
 	end
-	love.graphics.draw(Ship.Image,Ship.Position.X,Ship.Position.Y,math.rad(Ship.Rotation),(20/256),(20/256),120,120)
+	love.graphics.setColor(255,255,255,255);
+	if UFO.Active then
+		love.graphics.draw(UFO.Image,UFO.Position.X,UFO.Position.Y,0,.25,.25,(135*.25)*.25,(135*.25)*.25);
+	end
+	if not Ship.Dead then
+		love.graphics.draw(Ship.Image,Ship.Position.X,Ship.Position.Y,math.rad(Ship.Rotation),(20/256),(20/256),120,120)
+	end
 end
